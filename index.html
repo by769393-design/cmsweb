@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Contact Management System</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #b8222254; padding: 20px; }
+    .container { max-width: 750px; background: rgba(255, 255, 255, 0.541); padding: 20px; margin: auto; border-radius: 5px; }
+    h1 { text-align: center; }
+    input, textarea, button { width: 100%; padding: 10px; margin: 5px 0; }
+    textarea { resize: none; }
+    button { border: none; cursor: pointer; color: rgb(89, 204, 194); transition: background 0.3s; }
+    .save { background: #007bff; }
+    .save.editing { background: #ffeb3b; color: black; } /* yellow when editing */
+    .delete { background: #dc3545; }
+    .call { background: #28a745; }
+    .msg { background: #17a2b8; }
+
+    /* 💛 Edit mode fields highlight */
+    .edit-mode {
+        background-color: #fff9c4 !important; /* light yellow */
+        border: 2px solid #ffb300 !important; /* orange border */
+    }
+
+    ul { list-style: none; padding: 0; }
+    li { background: #eee; margin: 10px 0; padding: 10px; }
+    img { max-width: 80px; margin-bottom: 5px; }
+    .actions button { width: 48%; margin-top: 5px; }
+    .search { margin-bottom: 15px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>Contact Management System</h1>
+
+<input type="text" id="search" class="search" placeholder="Search contacts by name..." onkeyup="searchContact()">
+
+<input type="hidden" id="editIndex">
+
+<input type="text" id="firstName" placeholder="First Name">
+<input type="text" id="lastName" placeholder="Last Name">
+<input type="text" id="phone" placeholder="Phone Number (10 digits)" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+<input type="email" id="email" placeholder="Email Address">
+<textarea id="address" placeholder="Address"></textarea>
+<input type="date" id="birthday">
+<input type="file" id="photo" accept="image/*">
+
+<button class="save" id="saveButton" onclick="saveContact()">Save Contact</button>
+
+<ul id="contactList"></ul>
+</div>
+
+<script>
+let contacts = JSON.parse(localStorage.getItem("contacts")) || [];
+const formFields = ["firstName","lastName","phone","email","address","birthday"];
+const saveButton = document.getElementById("saveButton");
+
+function enableEditMode() {
+    formFields.forEach(id => document.getElementById(id).classList.add("edit-mode"));
+    saveButton.classList.add("editing"); // 🔹 Save button yellow when editing
+}
+
+function disableEditMode() {
+    formFields.forEach(id => document.getElementById(id).classList.remove("edit-mode"));
+    saveButton.classList.remove("editing"); // 🔹 revert Save button
+}
+
+function isValidPhone(phone) { return /^\d{10}$/.test(phone); }
+function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+
+function saveContact() {
+    let firstName = document.getElementById("firstName").value.trim();
+    let lastName = document.getElementById("lastName").value.trim();
+    let phone = document.getElementById("phone").value.trim();
+    let email = document.getElementById("email").value.trim();
+    let address = document.getElementById("address").value.trim();
+    let birthday = document.getElementById("birthday").value;
+    let photoInput = document.getElementById("photo");
+    let editIndex = document.getElementById("editIndex").value;
+
+    if(!firstName||!lastName||!phone||!email){ alert("Please fill all required fields"); return;}
+    if(!isValidPhone(phone)){ alert("Phone must be 10 digits"); return;}
+    if(!isValidEmail(email)){ alert("Enter valid email"); return;}
+
+    if(photoInput.files.length>0){
+        let reader=new FileReader();
+        reader.onload=()=> saveData(reader.result);
+        reader.readAsDataURL(photoInput.files[0]);
+    }else{ saveData(null); }
+
+    function saveData(photo){
+        let contact={firstName,lastName,phone,email,address,birthday,photo:photo || (editIndex!=="" ? contacts[editIndex].photo:null)};
+        if(editIndex===""){ contacts.push(contact); }
+        else{
+            contacts[editIndex]=contact;
+            document.getElementById("editIndex").value="";
+            disableEditMode(); // reset yellow fields & button
+        }
+        localStorage.setItem("contacts",JSON.stringify(contacts));
+        clearInputs();
+        displayContacts();
+    }
+}
+
+function displayContacts(list=contacts){
+    let contactList=document.getElementById("contactList");
+    contactList.innerHTML="";
+    list.forEach((c,index)=>{
+        let li=document.createElement("li");
+        li.innerHTML=`
+            ${c.photo?`<img src="${c.photo}">`:""}
+            <strong>${c.firstName} ${c.lastName}</strong><br>
+            📞 ${c.phone}<br>
+            📧 ${c.email}<br>
+            🏠 ${c.address||"N/A"}<br>
+            🎂 ${c.birthday||"N/A"}
+            <div class="actions">
+                <a href="tel:${c.phone}"><button class="call">Call</button></a>
+                <a href="sms:${c.phone}"><button class="msg">Message</button></a>
+                <button onclick="editContact(${index})">Edit</button>
+                <button class="delete" onclick="deleteContact(${index})">Delete</button>
+            </div>
+        `;
+        contactList.appendChild(li);
+    });
+}
+
+function editContact(index){
+    let c=contacts[index];
+    document.getElementById("firstName").value=c.firstName;
+    document.getElementById("lastName").value=c.lastName;
+    document.getElementById("phone").value=c.phone;
+    document.getElementById("email").value=c.email;
+    document.getElementById("address").value=c.address;
+    document.getElementById("birthday").value=c.birthday;
+    document.getElementById("editIndex").value=index;
+    enableEditMode(); // 🔹 fields yellow & Save Contact yellow
+}
+
+function deleteContact(index){
+    if(confirm("Delete this contact?")){
+        contacts.splice(index,1);
+        localStorage.setItem("contacts",JSON.stringify(contacts));
+        displayContacts();
+    }
+}
+
+function searchContact(){
+    let value=document.getElementById("search").value.toLowerCase();
+    let filtered=contacts.filter(c=>(`${c.firstName} ${c.lastName}`).toLowerCase().includes(value));
+    displayContacts(filtered);
+}
+
+function clearInputs(){
+    ["firstName","lastName","phone","email","address","birthday","photo"].forEach(id=>document.getElementById(id).value="");
+}
+
+displayContacts();
+</script>
+
+</body>
+</html>
